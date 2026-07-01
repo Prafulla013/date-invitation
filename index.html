@@ -214,6 +214,67 @@
   .picked-line{ margin-top:14px; font-size:.9em; min-height:1.2em; color:var(--rose-dark); font-weight:600; }
 
   .small-note{ font-size:.85em; opacity:.65; margin-top:18px; }
+
+  /* ---------- location card ---------- */
+  .loc-card{
+    margin-top:22px;
+    width:100%;
+    max-width:320px;
+    background:var(--cream);
+    border-radius:18px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    box-shadow:0 12px 26px -12px rgba(168,51,90,.3);
+    border:1px solid var(--blush-deep);
+  }
+  .loc-pin{ font-size:1.6em; }
+  .loc-text{ flex:1; text-align:left; }
+  .loc-name{ font-weight:700; color:var(--rose-dark); font-size:.98em; }
+  .loc-sub{ font-size:.82em; opacity:.7; }
+  .loc-btn{
+    font-size:.78em;
+    font-weight:600;
+    color:#fff;
+    background:linear-gradient(135deg,var(--rose),var(--rose-dark));
+    padding:8px 12px;
+    border-radius:999px;
+    text-decoration:none;
+    white-space:nowrap;
+  }
+
+  /* ---------- countdown ---------- */
+  .countdown{
+    margin-top:18px;
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .countdown .unit{
+    background:#fff;
+    border:1px solid var(--blush-deep);
+    border-radius:14px;
+    padding:10px 14px;
+    min-width:56px;
+  }
+  .countdown .unit .num{
+    display:block;
+    font-weight:700;
+    font-size:1.25em;
+    color:var(--rose-dark);
+  }
+  .countdown .unit .lbl{
+    display:block;
+    font-size:.68em;
+    opacity:.65;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    margin-top:2px;
+  }
+
+  #addCalBtn{ margin-top:22px; }
 </style>
 </head>
 <body>
@@ -297,6 +358,19 @@
     <div class="script" style="font-size:1.7em; margin-top:6px;">So excited for our date.</div>
     <div class="script" style="font-size:1.7em;">See you soon 💕</div>
     <p class="small-note" id="finalDetails"></p>
+
+    <div class="loc-card" id="locCard">
+      <div class="loc-pin">📍</div>
+      <div class="loc-text">
+        <div class="loc-name">Kimchi Restaurant</div>
+        <div class="loc-sub">Anamnagar</div>
+      </div>
+      <a id="mapLink" href="#" target="_blank" rel="noopener" class="loc-btn">Open in Maps</a>
+    </div>
+
+    <div class="countdown" id="countdown"></div>
+
+    <button class="btn-gold" id="addCalBtn" onclick="downloadIcs()">Add to Calendar 🌹</button>
   </div>
 
 </div>
@@ -436,8 +510,12 @@ function formatTime(t){
 document.getElementById('timeInput').addEventListener('input', updatePickedLine);
 
 let chosenDateText = '';
+let chosenDateTime = null; // actual JS Date for countdown / ics
 function confirmDate(){
   chosenDateText = document.getElementById('pickedLine').textContent;
+  const t = document.getElementById('timeInput').value; // "HH:MM"
+  const [hh, mm] = t.split(':').map(Number);
+  chosenDateTime = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), hh, mm);
   show('screen-q3');
 }
 
@@ -469,21 +547,84 @@ function dodgeClick(){
   finishFinal();
 }
 
+const DATE_LOCATION_NAME = "Kimchi Restaurant, Anamnagar";
+const DATE_LOCATION_MAPS_QUERY = "Kimchi Restaurant Anamnagar Kathmandu";
+
 function finishFinal(){
   document.getElementById('finalDetails').textContent = chosenDateText ? ('Locked in: '+chosenDateText) : '';
+  document.getElementById('mapLink').href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(DATE_LOCATION_MAPS_QUERY);
   show('screen-final');
   fallPetals();
   sendAnswer();
+  startCountdown();
+}
+
+/* ---------------- live countdown to the date ---------------- */
+let countdownTimer = null;
+function startCountdown(){
+  const el = document.getElementById('countdown');
+  if(!chosenDateTime){ el.style.display='none'; return; }
+  function tick(){
+    const diff = chosenDateTime.getTime() - Date.now();
+    if(diff <= 0){
+      el.innerHTML = '<div class="unit"><span class="num">💕</span><span class="lbl">it\'s today</span></div>';
+      clearInterval(countdownTimer);
+      return;
+    }
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    el.innerHTML = `
+      <div class="unit"><span class="num">${days}</span><span class="lbl">days</span></div>
+      <div class="unit"><span class="num">${hours}</span><span class="lbl">hrs</span></div>
+      <div class="unit"><span class="num">${mins}</span><span class="lbl">min</span></div>
+      <div class="unit"><span class="num">${secs}</span><span class="lbl">sec</span></div>
+    `;
+  }
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+/* ---------------- add to calendar (.ics download) ---------------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function toIcsStamp(d){
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
+}
+function downloadIcs(){
+  if(!chosenDateTime){ return; }
+  const start = chosenDateTime;
+  const end = new Date(start.getTime() + 2*60*60*1000); // 2 hour block
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//our second date//EN',
+    'BEGIN:VEVENT',
+    'UID:'+Date.now()+'@second-date',
+    'DTSTAMP:'+toIcsStamp(new Date()),
+    'DTSTART:'+toIcsStamp(start),
+    'DTEND:'+toIcsStamp(end),
+    'SUMMARY:Our Second Date 💕',
+    'LOCATION:'+DATE_LOCATION_NAME,
+    'DESCRIPTION:Just the two of us. Can\'t wait!',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const blob = new Blob([ics], {type: 'text/calendar'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'our-second-date.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ---------------- send the answer to you ---------------- */
-// 1. Go to https://formspree.io and sign up free
-// 2. Create a new form, copy the endpoint it gives you
-// 3. Paste it below, replacing the placeholder
 const FORM_ENDPOINT = "https://formspree.io/f/xdarwawn";
 
 function sendAnswer(){
-  if(FORM_ENDPOINT.includes("YOUR_FORM_ID")) return; // not set up yet
   fetch(FORM_ENDPOINT, {
     method: "POST",
     headers: { "Accept": "application/json", "Content-Type": "application/json" },
@@ -491,6 +632,7 @@ function sendAnswer(){
       subject: "She said yes! 💌",
       readyForSecondDate: "Yes",
       pickedDateAndTime: chosenDateText || "(not captured)",
+      location: DATE_LOCATION_NAME,
       bringingSister: "No — after dodging the button " + dodgeCount + " times",
       timestamp: new Date().toString()
     })
