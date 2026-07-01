@@ -473,6 +473,28 @@ function finishFinal(){
   document.getElementById('finalDetails').textContent = chosenDateText ? ('Locked in: '+chosenDateText) : '';
   show('screen-final');
   fallPetals();
+  sendAnswer();
+}
+
+/* ---------------- send the answer to you ---------------- */
+// 1. Go to https://formspree.io and sign up free
+// 2. Create a new form, copy the endpoint it gives you
+// 3. Paste it below, replacing the placeholder
+const FORM_ENDPOINT = "https://formspree.io/f/xdarwawn";
+
+function sendAnswer(){
+  if(FORM_ENDPOINT.includes("YOUR_FORM_ID")) return; // not set up yet
+  fetch(FORM_ENDPOINT, {
+    method: "POST",
+    headers: { "Accept": "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subject: "She said yes! 💌",
+      readyForSecondDate: "Yes",
+      pickedDateAndTime: chosenDateText || "(not captured)",
+      bringingSister: "No — after dodging the button " + dodgeCount + " times",
+      timestamp: new Date().toString()
+    })
+  }).catch(()=>{ /* fail silently, her experience shouldn't break */ });
 }
 </script>
 </body>
